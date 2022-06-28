@@ -46,7 +46,7 @@ if __name__ == '__main__':
         '--max_length', type=int, default=1000000,
         help='Maximum length if input is a movie or directory')
     parser.add_argument(
-        '--resize', type=int, nargs='+', default=[640, 480],
+        '--resize', type=int, nargs='+', default=[-1],
         help='Resize the input image before running inference. If two numbers, '
              'resize to the exact dimensions, if one number, resize the max '
              'dimension, if -1, do not resize')
@@ -159,9 +159,12 @@ if __name__ == '__main__':
         timer.update('data')
         stem_t, stem_s = last_image_id, vs.i - 1
 
-        pred = network.get_matches_and_confidence(target_img=torch.from_numpy(last_data['image0']).permute(2, 0, 1)
-                                                  .unsqueeze(0), source_img=torch.from_numpy(frame).permute(2, 0, 1)
-                                                  .unsqueeze(0), confident_mask_type=confident_mask_type)
+
+        target_image_variable = torch.from_numpy(last_data['image0']).permute(2, 0, 1).unsqueeze(0)
+        source_image_variable = torch.from_numpy(frame).permute(2, 0, 1).unsqueeze(0)
+        timer.update('copy')
+        
+        pred = network.get_matches_and_confidence(target_img=target_image_variable, source_img=source_image_variable, confident_mask_type=confident_mask_type)
 
         timer.update('forward')
 
