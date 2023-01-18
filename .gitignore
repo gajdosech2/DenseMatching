@@ -7,3 +7,9 @@
 **qsublogs
 **qsub_logs
 admin/local.py
+*.png
+*.exr
+*.csv
+*.zip
+*build/
+*dist/

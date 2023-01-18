@@ -6,6 +6,7 @@ sys.path.append("C:/GIT/DenseMatching/")
 
 import argparse
 import numpy as np
+import time
 import imageio
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm    
@@ -36,8 +37,6 @@ homography_visibility_mask = True
 scaling_factors = [0.5, 0.6, 0.88, 1, 1.33, 1.66, 2]
 compute_cyclic_consistency_error = True 
 uncertainty_key = 'p_r'
-k_top = 60000*2
-skip = 120*2
 scale = 1
 
 args = DotDict({'network_type': model, 'multi_stage_type': multi_stage_type, 'confidence_map_R': confidence_map_R, 
@@ -46,20 +45,22 @@ args = DotDict({'network_type': model, 'multi_stage_type': multi_stage_type, 'co
                 'compute_cyclic_consistency_error': compute_cyclic_consistency_error})
 
 
-def main(f1, f2):
+def main(f1, f2, k_top=10000, skip=2, scale_factor=1.0):
     # load images
     query_img = cv2.imread(f1, cv2.IMREAD_UNCHANGED)
+    width = int(query_img.shape[1] * scale_factor)
+    height = int(query_img.shape[0] * scale_factor)
+    dim = (width, height)
+    query_img = cv2.resize(query_img, dim, interpolation = cv2.INTER_AREA)
     query_img = cv2.cvtColor(query_img, cv2.COLOR_BGR2RGB)
     norm = np.zeros(query_img.shape)
     query_image = cv2.normalize(query_img,  norm, 0, 255*scale, cv2.NORM_MINMAX)
 
     reference_img = cv2.imread(f2, cv2.IMREAD_UNCHANGED)
+    reference_img = cv2.resize(reference_img, dim, interpolation = cv2.INTER_AREA)
     reference_img = cv2.cvtColor(reference_img, cv2.COLOR_BGR2RGB)
     norm = np.zeros(reference_img.shape)
     reference_image = cv2.normalize(reference_img,  norm, 0, 255*scale, cv2.NORM_MINMAX)
-
-    query_image = query_image.astype(np.uint8)
-    reference_image = reference_image.astype(np.uint8)
 
     # query_image = imageio.imread(sys.argv[1], pilmode='RGB')
     # reference_image = imageio.imread(sys.argv[2], pilmode='RGB')
@@ -82,9 +83,14 @@ def main(f1, f2):
         path_to_pre_trained_models=path_to_pre_trained_models)
     estimate_uncertainty = True  
 
+    print(query_image.shape)
+    print(reference_image.shape)
+
+    start = time.time()
     # run network 
     estimated_flow, uncertainty_components = network.estimate_flow_and_confidence_map(query_image_, reference_image_)
-     
+    print("Network Execution Time: " + str(int((time.time() - start) * 1000)) + " ms")
+      
     # filter correspondences  
     confidence_map = uncertainty_components[uncertainty_key]
     confidence_map = confidence_map[:, :, :ref_image_shape[0], :ref_image_shape[1]]
@@ -106,8 +112,8 @@ def main(f1, f2):
     mkpts_ref = np.array(mkpts_ref)[sort_index]
         
     # save top matches 
-    mkpts_q = mkpts_query[:k_top:skip]
-    mkpts_r = mkpts_ref[:k_top:skip]
+    mkpts_q = mkpts_query[:k_top:skip] / scale_factor
+    mkpts_r = mkpts_ref[:k_top:skip] / scale_factor
     confidence_values = confidence_values[:k_top:skip]
 
     np.savetxt('ptsq.csv', np.asarray(mkpts_q), delimiter=',', fmt='%d')
@@ -119,10 +125,17 @@ def main(f1, f2):
     plt.figure(figsize=(20,10))
     plt.imshow(out)
     plt.savefig("match.png", bbox_inches='tight')
-    return len(mkpts_q)
+    return str(len(mkpts_q))
 
 
 if __name__ == "__main__":
-    if len(sys.argv) != 3:
+    if len(sys.argv) < 3:
         print("Wrong number of input parameters")
-    main(sys.argv[1], sys.argv[2])
+    elif len(sys.argv) == 3:
+        main(sys.argv[1], sys.argv[2])     
+    elif len(sys.argv) == 4:
+        main(sys.argv[1], sys.argv[2], sys.argv[3])      
+    elif len(sys.argv) == 5:
+        main(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4])  
+    elif len(sys.argv) == 6:
+        main(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5])  
